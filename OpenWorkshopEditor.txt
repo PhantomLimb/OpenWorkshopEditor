@@ -1,0 +1,1 @@
+./Release/EditorApp.cpp.o ./Release/EditorFrame.cpp.o ./Release/FileImporter.cpp.o ./Release/EditorGLContext.cpp.o ./Release/main.cpp.o ./Release/EditorGLCanvas.cpp.o   
