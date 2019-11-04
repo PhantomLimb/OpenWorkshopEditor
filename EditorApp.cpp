@@ -10,7 +10,9 @@ bool EditorApp::OnInit()
     editor_frame->SetFont(default_font);
     
     //canvas
-    EditorGLCanvas * editor_gl_canvas = new EditorGLCanvas(editor_frame);
+    wxGLAttributes * attributes = new wxGLAttributes;
+    attributes->PlatformDefaults().SampleBuffers(4).Samplers(4).EndList();
+    EditorGLCanvas * editor_gl_canvas = new EditorGLCanvas(editor_frame, *attributes);
     wxBoxSizer * canvas_sizer = new wxBoxSizer(wxHORIZONTAL);
     canvas_sizer->SetMinSize(300, 200);
     editor_gl_canvas->SetSizer(canvas_sizer);
@@ -58,7 +60,9 @@ EditorGLContext * EditorApp::get_gl_context(wxGLCanvas * canvas)
 {
     if (editor_gl_context == nullptr)
     {
-        editor_gl_context = new EditorGLContext(canvas);
+        wxGLContextAttrs * attributes = new wxGLContextAttrs;
+        attributes->CoreProfile().OGLVersion(4, 5).Robust().ResetIsolation().EndList();
+        editor_gl_context = new EditorGLContext(canvas, attributes);
     }
     //editor_gl_context->SetCurrent(canvas);
     return editor_gl_context;

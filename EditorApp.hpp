@@ -1,5 +1,7 @@
 #ifndef EDITOR_APP_HPP
 #define EDITOR_APP_HPP
+
+#include <glew.h>
 #include <wx/wx.h>
 #include <wx/glcanvas.h>
 

@@ -1,6 +1,7 @@
 #ifndef EDITOR_FRAME_HPP
 #define EDITOR_FRAME_HPP
 
+#include <glew.h>
 #include <wx/wx.h>
 
 class EditorApp;

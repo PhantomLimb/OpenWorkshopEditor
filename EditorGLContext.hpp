@@ -7,7 +7,7 @@
 class EditorGLContext : public wxGLContext
 {
 public:
-    EditorGLContext(wxGLCanvas * canvas);
+    EditorGLContext(wxGLCanvas * canvas, wxGLContextAttrs * p_attributes = NULL);
     void init_opengl();
     bool done_init;
 };
