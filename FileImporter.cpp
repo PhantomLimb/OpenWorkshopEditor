@@ -1,10 +1,12 @@
 #include "FileImporter.hpp"
+#include "LnzLoader.hpp"
 
 FileImporter::FileImporter()
 {
     memcpy(dos_header_signature, "MZ", 2);
     memcpy(pe_header_signature, "PE\0\0", 4);
     addr_pointer_pe_header = 0x3C;
+    lnz_loaded = false;
 }
 
 FileImporter::~FileImporter()
@@ -30,30 +32,28 @@ FileImporter::RsrcEntry::RsrcEntry(uint32 p_address, RsrcTable * p_parent, RsrcT
     {
         id = p_name_or_id;
     }
-    name = nullptr;
+    name = "";
 }
 
-char * FileImporter::RsrcEntry::get_name(fstream & p_file)
+string FileImporter::RsrcEntry::get_name(fstream & p_file)
 {
     // make sure the resource actually HAS a name
     if (type != RSRC_NAME)
     {
-        return nullptr;
+        return "";
     }
-    if (name == nullptr)
+    if (name == "")
     {
         //save our current position in the file so we can return to it
         int original_position = p_file.tellg();
         printf("Looking for name at: %08lX\n", name_address);
         p_file.seekg(name_address);
-        uint16 length = read_uint16(p_file);
-        name = new char[128];
+        uint16 length = Util::read_uint16(p_file);
         for (int i = 0; i<length; i++)
         {
-            name[i] = p_file.get();
-            p_file.get();
+            name.push_back(p_file.get());
+            p_file.get(); // because there's a weird empty space between each letter
         }
-        name[length] = '\0';
         p_file.seekg(original_position);
     }
     return name;
@@ -61,10 +61,6 @@ char * FileImporter::RsrcEntry::get_name(fstream & p_file)
 
 FileImporter::RsrcEntry::~RsrcEntry()
 {
-    if (name!=nullptr)
-    {
-        delete name;
-    }
 }
 
 FileImporter::RsrcTable::RsrcTable(uint32 p_address, RsrcTable * p_parent, RsrcType p_type, uint32 p_name_or_id)
@@ -80,41 +76,35 @@ FileImporter::RsrcTable::RsrcTable(uint32 p_address, RsrcTable * p_parent, RsrcT
     {
         id = p_name_or_id;
     }
-    name = nullptr;
+    name = "";
     unprocessed = true;
     has_unprocessed_children = true;
 }
 
 FileImporter::RsrcTable::~RsrcTable()
 {
-    if (name!=nullptr)
-    {
-        delete name;
-    }
 }
 
-char * FileImporter::RsrcTable::get_name(fstream & p_file)
+string FileImporter::RsrcTable::get_name(fstream & p_file)
 {
     // make sure the resource actually HAS a name
     if (type != RSRC_NAME)
     {
-        return nullptr;
+        return "";
     }
-    if (name == nullptr)
+    if (name == "")
     {
         //save our current position in the file so we can return to it
         int original_position = p_file.tellg();
         printf("Looking for name at: %08lX\n", name_address);
         p_file.seekg(name_address);
-        uint16 length = read_uint16(p_file);
-        name = new char[128];
+        uint16 length = Util::read_uint16(p_file);
         for (int i = 0; i<length; i++)
         {
-            name[i] = p_file.get();
+            name.push_back(p_file.get());
             p_file.get();
         }
         p_file.seekg(original_position);
-        name[length] = '\0';
     }
     return name;
 }
@@ -129,53 +119,37 @@ uint32 FileImporter::RsrcEntry::get_id()
     return id;
 }
 
-void FileImporter::clear_buffer(char * buffer, int size)
-{
-    memset(buffer, 0, size);
-}
-
-
-uint16 FileImporter::read_uint16(fstream & file, bool do_print)
-{
-    const int size = 2;
-    char * buffer = new char[8];
-    file.read(buffer,size);
-    uint16 output = ((uint16)buffer[1]<<8 & 0xFF00) | ((uint16)buffer[0] & 0xFF);
-    if (do_print)
-    {
-        printf("Read uint16: %u (hex: %04X)\n", output, output);
-    }
-    delete[] buffer;
-    return output;
-}
-
-uint32 FileImporter::read_uint32(fstream & file, bool do_print)
-{
-    const int size = 4;
-    char * buffer = new char[8];
-    file.read(buffer,size);
-    uint32 output = ((uint32)buffer[0] & 0xFF) | ((uint32)buffer[1]<<8 & 0xFF00) | ((uint32)buffer[2]<<16 & 0xFF0000) | ((uint32)buffer[3]<<24 & 0xFF000000);
-    if (do_print)
-    {
-        printf("Read uint32: %lu (hex: %08lX)\n", output, output);
-    }
-    delete[] buffer;
-    return output;
-}
-
 void FileImporter::load_rsrc_entry(FileSection * p_section, fstream & p_file, RsrcEntry * p_entry)
 {
     p_file.seekg(p_entry->address);
-    uint32 data_rva = read_uint32(p_file);
-    uint32 data_size = read_uint32(p_file);
+    uint32 data_rva = Util::read_uint32(p_file);
+    uint32 data_size = Util::read_uint32(p_file);
     printf("DATA RVA: %08lX\n", data_rva);
     if (p_entry->parent->type == RSRC_NAME)
     {
-        printf("NAME: %s\n", p_entry->parent->get_name(p_file));
+        printf("NAME: %s\n", p_entry->parent->get_name(p_file).c_str());
     }
     else if (p_entry->parent->type == RSRC_ID)
     {
         printf("ID: %08lX\n", p_entry->parent->get_id());
+    }
+    string file_type = "";
+    if (p_entry->parent->parent->type == RSRC_NAME)
+    {
+        file_type = p_entry->parent->parent->get_name(p_file);
+        printf("TYPE: %s\n", p_entry->parent->parent->get_name(p_file).c_str());
+    }
+    if (file_type == "LNZ" && !lnz_loaded)
+    {
+        lnz_loaded = true;
+        p_file.seekg(data_rva);
+        char * buffer = new char[data_size];
+        Util::clear_buffer(buffer, data_size);
+        p_file.read(buffer, data_size);
+        printf("%s \n", buffer);
+        LnzLoader lnz_loader;
+        lnz_loader.load(string(buffer));
+        delete buffer;
     }
 }
 
@@ -187,7 +161,7 @@ bool FileImporter::import(char * p_file_path)
     fs.seekg(0);
     //read the dos header to make sure its the right type of file
     char dos_header_buffer[16];
-    clear_buffer(dos_header_buffer, 16);
+    Util::clear_buffer(dos_header_buffer, 16);
     fs.read(dos_header_buffer, 2);
     //if theres no DOS signature, give up!
     if (memcmp(dos_header_buffer, dos_header_signature, 2) != 0)
@@ -200,11 +174,11 @@ bool FileImporter::import(char * p_file_path)
     //skip to the address of the pointer to the PE header 
     fs.seekg(addr_pointer_pe_header);
     //read the pointer...
-    uint32 pointer_pe_header = read_uint32(fs);
+    uint32 pointer_pe_header = Util::read_uint32(fs);
     //...now skip to the PE header
     fs.seekg(pointer_pe_header);
     char pe_header_buffer[16];
-    clear_buffer(pe_header_buffer, 16);
+    Util::clear_buffer(pe_header_buffer, 16);
     fs.read(pe_header_buffer, 4);
     //and if there's no PE header, give up!!
     if (memcmp(pe_header_buffer, pe_header_signature, 4) != 0)
@@ -216,15 +190,15 @@ bool FileImporter::import(char * p_file_path)
     printf("Valid PE HEADER SIGNATURE found.\n");
     
     //some cool info that we dont really care about
-    read_uint16(fs); //machine
+    Util::read_uint16(fs); //machine
     //info that we do care about
-    uint16 number_of_sections = read_uint16(fs);
-    const long int time_date_stamp = read_uint32(fs);
+    uint16 number_of_sections = Util::read_uint16(fs);
+    const long int time_date_stamp = Util::read_uint32(fs);
     printf ("Time Stamp: %s", ctime(&time_date_stamp));
-    read_uint32(fs); //pointer to symbol table - deprecated, i guess we can ignore this
-    read_uint32(fs); //number of symbol tables - deprecated, ignore this too i guess???
-    uint16 size_of_optional_header = read_uint16(fs);
-    read_uint16(fs); // coff characteristics - i dont think we need this
+    Util::read_uint32(fs); //pointer to symbol table - deprecated, i guess we can ignore this
+    Util::read_uint32(fs); //number of symbol tables - deprecated, ignore this too i guess???
+    uint16 size_of_optional_header = Util::read_uint16(fs);
+    Util::read_uint16(fs); // coff characteristics - i dont think we need this
     //skip the optional header for now because it doesnt seem important to this project
     fs.seekg(fs.tellg() + fstream::streampos(size_of_optional_header));
     //save all the file sections to a vector
@@ -235,15 +209,15 @@ bool FileImporter::import(char * p_file_path)
         file_sections.push_back(current_section);
         fs.read(current_section->name, 8);
         printf("Found section: %s\n", current_section->name);
-        current_section->virtual_size = read_uint32(fs);
-        current_section->virtual_address_rva = read_uint32(fs);
-        current_section->raw_data_size = read_uint32(fs);
-        current_section->pointer_raw_data = read_uint32(fs);
-        current_section->pointer_relocations = read_uint32(fs);
-        current_section->pointer_line_numbers = read_uint32(fs);
-        current_section->number_of_relocations = read_uint16(fs);
-        current_section->number_of_line_numbers = read_uint16(fs);
-        current_section->characteristics = read_uint32(fs);
+        current_section->virtual_size = Util::read_uint32(fs);
+        current_section->virtual_address_rva = Util::read_uint32(fs);
+        current_section->raw_data_size = Util::read_uint32(fs);
+        current_section->pointer_raw_data = Util::read_uint32(fs);
+        current_section->pointer_relocations = Util::read_uint32(fs);
+        current_section->pointer_line_numbers = Util::read_uint32(fs);
+        current_section->number_of_relocations = Util::read_uint16(fs);
+        current_section->number_of_line_numbers = Util::read_uint16(fs);
+        current_section->characteristics = Util::read_uint32(fs);
     }
     // now iterate through the vector and process the parts we need
     for (int i=0; i<file_sections.size(); i++)
@@ -265,17 +239,17 @@ bool FileImporter::import(char * p_file_path)
 void FileImporter::load_rsrc_table(FileSection * p_section, fstream & p_file, RsrcTable * p_table)
 {
     p_file.seekg(p_table->address);
-    read_uint32(p_file);
-    read_uint32(p_file);
-    read_uint16(p_file);
-    read_uint16(p_file);
-    p_table->number_of_name_entries = read_uint16(p_file);
-    p_table->number_of_id_entries = read_uint16(p_file);
+    Util::read_uint32(p_file);
+    Util::read_uint32(p_file);
+    Util::read_uint16(p_file);
+    Util::read_uint16(p_file);
+    p_table->number_of_name_entries = Util::read_uint16(p_file);
+    p_table->number_of_id_entries = Util::read_uint16(p_file);
     for (int i = 0; i< p_table->number_of_name_entries; i++)
     {
-        uint32 name_offset = read_uint32(p_file);
+        uint32 name_offset = Util::read_uint32(p_file);
         name_offset = (name_offset & 0x7FFFFFFF) + p_section->pointer_raw_data;
-        uint32 subdirectory_or_data_offset = read_uint32(p_file);
+        uint32 subdirectory_or_data_offset = Util::read_uint32(p_file);
         subdirectory_or_data_offset += p_section->pointer_raw_data;
         if ((subdirectory_or_data_offset & 0x80000000) == 0)
         {
@@ -299,8 +273,8 @@ void FileImporter::load_rsrc_table(FileSection * p_section, fstream & p_file, Rs
     }
     for (int i = 0; i< p_table->number_of_id_entries; i++)
     {
-        uint32 entry_id = read_uint32(p_file);
-        uint32 subdirectory_or_data_offset = read_uint32(p_file);
+        uint32 entry_id = Util::read_uint32(p_file);
+        uint32 subdirectory_or_data_offset = Util::read_uint32(p_file);
         subdirectory_or_data_offset += p_section->pointer_raw_data;
         if ((subdirectory_or_data_offset & 0x80000000) == 0)
         {

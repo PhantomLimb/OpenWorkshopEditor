@@ -7,11 +7,9 @@
 #include <cstring>
 #include <ctime>
 #include <vector>
+#include "Util.hpp"
 
 using namespace std;
-
-typedef unsigned short int uint16;
-typedef unsigned long int uint32;
 
 class FileImporter
 {
@@ -19,9 +17,6 @@ public:
     FileImporter();
     ~FileImporter();
     bool import(char * p_file_path);
-    static uint16 read_uint16(fstream & p_file, bool do_print = false);
-    static uint32 read_uint32(fstream & p_file, bool do_print = false);
-    static void clear_buffer(char * buffer, int size);
 private:
     struct FileSection 
     {
@@ -53,13 +48,13 @@ private:
         RsrcTable * parent;
         RsrcType type;
         RsrcEntry(uint32 p_address = 0, RsrcTable * p_parent = nullptr, RsrcType p_type = RSRC_UNKNOWN, uint32 p_name_or_id = 0);
-        char * get_name(fstream & p_file);
+        string get_name(fstream & p_file);
         uint32 get_id();
         ~RsrcEntry();
     private:
         uint32 id;
         uint32 name_address;
-        char * name;
+        string name;
     };
     
     class RsrcTable
@@ -75,13 +70,13 @@ private:
         bool unprocessed;
         RsrcType type;
         RsrcTable(uint32 p_address = 0, RsrcTable * p_parent = nullptr, RsrcType p_type = RSRC_UNKNOWN, uint32 p_name_or_id = 0);
-        char * get_name(fstream & p_file);
+        string get_name(fstream & p_file);
         uint32 get_id();
         ~RsrcTable();
     private:
         uint32 id;
         uint32 name_address;
-        char * name;
+        string name;
     };
     void load_rsrc(FileSection * p_section, fstream & p_file);
     void load_rsrc_table(FileSection * p_section, fstream & p_file, RsrcTable * p_table);
@@ -93,7 +88,7 @@ private:
     char dos_header_signature[2];
     char pe_header_signature[4];
     uint32 addr_pointer_pe_header;
-    
+    bool lnz_loaded;
 
 };
 

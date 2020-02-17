@@ -5,6 +5,9 @@
 #include <wx/glcanvas.h>
 #include "EditorApp.hpp"
 #include "PreviewBall.hpp"
+#include <vector>
+
+using namespace std;
 
 wxDECLARE_APP(EditorApp);
 
@@ -19,7 +22,6 @@ private:
     bool done_init;
     void init_opengl();
     void render(wxIdleEvent & event);
-    PreviewBall * ball;
     wxDECLARE_EVENT_TABLE();
 };
 

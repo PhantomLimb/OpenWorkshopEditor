@@ -15,6 +15,7 @@ public:
     void load_shader(char * p_fs_path, char * p_vs_path);
     GLuint get_shader();
     void set_color(Color & p_color);
+    virtual void draw()=0;
 private:
     GLuint shader_program;
     Color color;

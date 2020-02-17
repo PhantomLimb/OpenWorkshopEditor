@@ -9,6 +9,9 @@ public:
     float y;
     float z;
     void set_position(float p_x, float p_y, float p_z);
+    Vertex & operator= (const Vertex & p_vertex);
+    Vertex operator- (const Vertex & p_operand);
+    Vertex operator+ (const Vertex & p_operand);
 };
     
 #endif // VERTEX_HPP

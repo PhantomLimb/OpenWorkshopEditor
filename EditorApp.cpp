@@ -1,6 +1,7 @@
 #include "EditorApp.hpp"
 #include "EditorGLCanvas.hpp"
 #include <wx/font.h>
+#include "AnimationLoader.hpp"
 
 bool EditorApp::OnInit()
 {
@@ -53,6 +54,10 @@ bool EditorApp::OnInit()
     editor_frame->SetSizeHints(500, 400);
     editor_frame->SetSizer(sizer);
     editor_frame->Show();
+    
+    AnimationLoader animation_loader;
+    animation_loader.load_BHD();
+    
     return true;
 }
 

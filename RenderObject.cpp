@@ -30,12 +30,12 @@ void RenderObject::load_shader(char * p_fs_path, char * p_vs_path)
     vs_file.open(p_vs_path, fstream::in);
     vs_file.seekg(0, vs_file.end);
     int vs_size = vs_file.tellg();
-    printf("%d\n", vs_size);
+    //printf("%d\n", vs_size);
     vs_buffer = new char[vs_size];
     vs_file.seekg(0, vs_file.beg);
     vs_file.get(vs_buffer, vs_size, '\0');
     vs_file.close();
-    printf("%s \n", vs_buffer);
+    //printf("%s \n", vs_buffer);
     GLuint vs = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vs, 1, &vs_buffer, NULL);
     glCompileShader(vs);
